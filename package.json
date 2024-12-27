@@ -3,7 +3,7 @@
   "private": true,
   "main": "index.js",
   "scripts": {
-    "build": "node ./index.js"
+    "build": "TZ=Europe/Paris node ./index.js > index.html"
   },
   "author": "",
   "license": "ISC",

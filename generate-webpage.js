@@ -15,8 +15,10 @@ ${content.join("\n")}
 };
 
 const Showing = ({ id, title, date, time }, url) => `
-    <a href="${url}#${id}">${title}</a> @ ${date} ${time}
+<a href="${url}#${id}">${title}</a> @ ${date} ${time}
 `;
+
+const GeneratedAt = () => `<div>Generated at ${new Date().toString()}</div>`;
 
 const Venue = ({
   id,
@@ -27,14 +29,14 @@ const Venue = ({
   distance,
   showings,
 }) => `<div>
-    <h2 id="${id}">${name}, in ${location} (${distance}km away)</h2>
-    <div>
-        <a href="${url}">Cinefil</a>
-        ${homepage ? ` | <a href="${homepage}">Homepage</a>` : ``}
-    </div>
-    <ul>
-        <li>${showings.map((showing) => Showing(showing, url)).join("</li><li>")}</li>
-    </ul>
+  <h2 id="${id}">${name}, in ${location} (${distance}km away)</h2>
+  <div>
+    <a href="${url}">Cinefil</a>
+    ${homepage ? ` | <a href="${homepage}">Homepage</a>` : ``}
+  </div>
+  <ul>
+    <li>${showings.map((showing) => Showing(showing, url)).join("</li><li>")}</li>
+  </ul>
 </div>`;
 
 const Heading = (...content) => `<h1>${content.join("\n")}</h1>`;
@@ -46,6 +48,7 @@ async function main(url, data) {
     Paragraph(`Find below information sourced from ${url}`),
     `<hr />`,
     ...data.map(Venue),
+    GeneratedAt(),
   );
 }
 
