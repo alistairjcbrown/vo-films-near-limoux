@@ -38,6 +38,9 @@ const Page = (...content) => {
     .venue h2 {
       align-items: center;
       display: flex;
+      column-gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
     }
 
     .venue h3 {
@@ -47,7 +50,6 @@ const Page = (...content) => {
     .venue-details {
       font-size: 1rem;
       font-weight: normal;
-      margin-left: 0.75rem;
     }
   </style>
 </head>
