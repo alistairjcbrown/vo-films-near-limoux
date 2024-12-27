@@ -1,0 +1,46 @@
+{
+  "elysee-limoux": {
+    "homepage": "https://www.cinemaude.org/movie-theater/limoux-lelysee",
+    "distance": 0
+  },
+  "colisee-carcassonne": {
+    "homepage": "https://www.cgrcinemas.fr/cinema/p0395-cgr-le-colisee-carcassonne/",
+    "distance": 26
+  },
+  "cinema-le-casino-ax-les-thermes": {
+    "homepage": "https://www.joa.fr/casinos/ax-les-thermes",
+    "distance": 82
+  },
+  "cine-get-centre-culturel-de-revel-toulouse": {
+    "homepage": "https://revel.veocinemas.fr/",
+    "distance": 61
+  },
+  "veo-castelnaudary": {
+    "homepage": "https://castelnaudary.veocinemas.fr/",
+    "distance": 40
+  },
+  "espace-culturel-andre-malraux": {
+    "homepage": "https://fr-fr.facebook.com/CinemamunicipaldeMirepoix/",
+    "distance": 33
+  },
+  "les-toiles-du-rex-pamiers": {
+    "homepage": "https://www.cinerexpamiers.com/",
+    "distance": 56
+  },
+  "cgr-carcassonne-carcassonne": {
+    "homepage": "https://www.cgrcinemas.fr/cinema/p5505-cgr-carcassonne/",
+    "distance": 30
+  },
+  "salle-elie-cabrol-pepieux": {
+    "homepage": "https://www.cinemaude.org/movie-theater/pepieux-salle-elie-cabrol",
+    "distance": 60
+  },
+  "cinema-le-rex-foix": {
+    "homepage": "https://www.cineazur.fr/foix/",
+    "distance": 68
+  },
+  "le-casino-lavelanet": {
+    "homepage": "https://cinemalecasino-lavelanet.com/",
+    "distance": 46
+  }
+}

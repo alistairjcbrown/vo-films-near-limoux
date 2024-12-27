@@ -1,0 +1,15 @@
+{
+  "name": "vo-films-near-limoux",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "build": "node ./index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "cheerio": "^1.0.0",
+    "date-fns": "^4.1.0"
+  }
+}
