@@ -1,24 +1,35 @@
-const Page = (...content) => {
-  return `
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>VO films near Limoux</title>
-  <link rel="stylesheet" href="css/styles.css?v=1.0">
-</head>
-<body>
-${content.join("\n")}
-</body>
-</html>
-`;
+const Page = require("./components/page");
+
+const options = {
+  weekday: 'long',
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
 };
 
-const Showing = ({ id, title, date, time }, url) => `
-<a href="${url}#${id}">${title}</a> @ ${date} ${time}
-`;
+const Showings = (showings, homepage, url) => {
+  if (showings.length === 0) {
+    return `
+      <div>
+        No version originale showings found. Please <a href="${homepage || url}">check the venue homepage</a> for further information and to review all showings.
+      </div>
+    `;
+  }
 
-const GeneratedAt = () => `<div>Generated at ${new Date().toString()}</div>`;
+  let dateGroup = '';
+  let output = ``;
+  showings.forEach(({ id, title, date, time }) => {
+    if (dateGroup !== date) {
+      if (dateGroup) output += `</ul>`;
+      output += `<h3>${new Date(date).toLocaleDateString('en-GB', options)}</h3>`
+      dateGroup = date;
+      output += `<ul>`;
+    }
+    output += `<li><a href="${url}#${id}">${title}</a> @ ${time}</li>`;
+  })
+  output += `<ul>`;
+  return output;
+}
 
 const Venue = ({
   id,
@@ -28,16 +39,18 @@ const Venue = ({
   homepage,
   distance,
   showings,
-}) => `<div>
-  <h2 id="${id}">${name}, in ${location} (${distance}km away)</h2>
-  <div>
-    <a href="${url}">Cinefil</a>
-    ${homepage ? ` | <a href="${homepage}">Homepage</a>` : ``}
-  </div>
-  <ul>
-    <li>${showings.map((showing) => Showing(showing, url)).join("</li><li>")}</li>
-  </ul>
-</div>`;
+}) => `
+    <div class="venue">
+      <h2 id="${id}">
+        ${name}, in ${location}
+        <span class="venue-details">
+          (${distance}km away) &nbsp;
+          [<a href="${url}">Cinefil</a>${homepage ? ` | <a href="${homepage}">Homepage</a>` : ``}]
+        </span>
+      </h2>
+      ${Showings(showings, homepage, url)}
+    </div>
+  `;
 
 const Heading = (...content) => `<h1>${content.join("\n")}</h1>`;
 const Paragraph = (...content) => `<p>${content.join("\n")}</p>`;
@@ -45,10 +58,10 @@ const Paragraph = (...content) => `<p>${content.join("\n")}</p>`;
 async function main(url, data) {
   return Page(
     Heading("Version Originale films near Limoux"),
-    Paragraph(`Find below information sourced from ${url}`),
+    Paragraph(`Information sourced from <a href="${url}">Cinefil</a>. Source code on <a href="https://github.com/alistairjcbrown/vo-films-near-limoux">Github</a>.`),
+    Paragraph(`Site generated on ${new Date().toLocaleDateString('en-GB', options)} at ${new Date().toTimeString()}`),
     `<hr />`,
     ...data.map(Venue),
-    GeneratedAt(),
   );
 }
 
