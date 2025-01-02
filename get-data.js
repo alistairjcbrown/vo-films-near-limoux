@@ -59,7 +59,9 @@ async function main(url) {
     const showings = await getShowings(venue);
     venueShowings.push({ ...venue, ...staticData[venue.id], showings });
   }
-  return venueShowings.sort((a, b) => a.distance - b.distance);
+  return venueShowings.sort(
+    (a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity),
+  );
 }
 
 module.exports = main;

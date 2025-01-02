@@ -36,7 +36,7 @@ const Venue = ({ id, name, location, url, homepage, distance, showings }) => `
       <h2 id="${id}">
         ${name}, in ${location}
         <span class="venue-details">
-          (${distance}km away) &nbsp;
+          ${typeof distance !== "undefined" ? `(${distance}km away) &nbsp;` : ""}
           [<a href="${url}">Cinefil</a>${homepage ? ` | <a href="${homepage}">Homepage</a>` : ``}]
         </span>
       </h2>
