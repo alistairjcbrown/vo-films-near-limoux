@@ -27,7 +27,7 @@ const Showings = (showings, homepage, url) => {
     }
     output += `<li><a href="${url}#${id}">${title}</a> @ ${time}</li>`;
   });
-  output += `<ul>`;
+  output += `</ul>`;
   return output;
 };
 
