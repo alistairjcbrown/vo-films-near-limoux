@@ -59,7 +59,7 @@ function getShowingFor($showingEl, $movieEl) {
 async function getShowings({ url }) {
   const $ = await getPage(url);
   const showings = [];
-  $("div.langue").each(function (index) {
+  $(".langue").each(function (index) {
     if ($(this).text().trim().toLowerCase() === "vo") {
       const showing = getShowingFor($(this), $(this).parents("li"), index);
       if (Date.now() < new Date(`${showing.date}T${showing.time}`)) {
