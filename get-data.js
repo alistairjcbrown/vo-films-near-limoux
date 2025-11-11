@@ -1,10 +1,30 @@
 const cheerio = require("cheerio");
+const { chromium } = require("playwright-extra");
 const { addDays, format } = require("date-fns");
 const staticData = require("./data.json");
+const stealth = require("puppeteer-extra-plugin-stealth")();
+chromium.use(stealth);
+
+async function getPageWithPlaywright(url) {
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await page.setViewportSize({ width: 1280, height: 720 });
+  try {
+    await page.goto(url);
+    await page.waitForLoadState();
+    const result = await page.content();
+    await browser.close();
+    return result;
+  } catch (error) {
+    throw error;
+  } finally {
+    await browser.close();
+  }
+}
 
 async function getPage(url) {
-  const response = await fetch(url);
-  const data = await response.text();
+  const data = await getPageWithPlaywright(url);
   return cheerio.load(data);
 }
 
