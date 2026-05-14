@@ -50,7 +50,7 @@ async function getVenues(url) {
 function getShowingFor($showingEl, $movieEl) {
   const index = $showingEl.parents(".tab-pane").index();
   const date = format(addDays(new Date(), index), "yyyy-MM-dd");
-  const time = $showingEl.parent().find(".h4").text().trim();
+  const time = $showingEl.parents("button").find(".seance-time").text().trim();
   const title = $movieEl.find('meta[itemprop="name"]').attr("content");
   const id = $movieEl.children("span").attr("id");
   return { id, title, date, time };
@@ -59,7 +59,7 @@ function getShowingFor($showingEl, $movieEl) {
 async function getShowings({ url }) {
   const $ = await getPage(url);
   const showings = [];
-  $(".langue").each(function (index) {
+  $(".seance-langue").each(function (index) {
     if ($(this).text().trim().toLowerCase() === "vo") {
       const showing = getShowingFor($(this), $(this).parents("li"), index);
       if (Date.now() < new Date(`${showing.date}T${showing.time}`)) {
