@@ -48,7 +48,8 @@ async function getVenues(url) {
 }
 
 function getShowingFor($showingEl, $movieEl) {
-  const index = $showingEl.parents(".tab-pane").index();
+  const $tabPane = $showingEl.parents(".tab-pane");
+  const index = $tabPane.parent().find(".tab-pane").index($tabPane);
   const date = format(addDays(new Date(), index), "yyyy-MM-dd");
   const time = $showingEl.parents("button").find(".seance-time").text().trim();
   const title = $movieEl.find('meta[itemprop="name"]').attr("content");
