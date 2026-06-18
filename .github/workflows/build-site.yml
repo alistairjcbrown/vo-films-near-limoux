@@ -33,14 +33,12 @@ jobs:
         with:
           node-version-file: .node-version
       - run: npm ci
-      # Cache the ~311MB Camoufox browser + GeoIP DB (user-space, no sudo) so it
-      # isn't re-downloaded each run - matters especially for ephemeral runners.
-      # fetch is a no-op when the cache is restored.
-      - name: Cache Camoufox browser
-        uses: actions/cache@v5
-        with:
-          path: ~/.cache/camoufox
-          key: camoufox-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      # The persistent self-hosted runner keeps ~/.cache/camoufox on its own
+      # disk between runs, so this is a near-instant no-op after the first run
+      # (and self-heals if the browser is ever missing). We deliberately do NOT
+      # use actions/cache here: on a self-hosted runner that would download and
+      # re-upload the ~650MB browser to GitHub's cache over the host's own
+      # connection every run, which is slower than just reusing the local copy.
       - name: Fetch Camoufox browser
         run: npx camoufox-js fetch
       - run: npm run build

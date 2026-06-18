@@ -37,6 +37,12 @@ provisioning the runner (Debian/Ubuntu):
 # headless: "virtual" display the scrape uses in CI.
 npx playwright@latest install-deps firefox
 sudo apt-get install -y xvfb
+
+# Optional: pre-download the Camoufox browser so even the first run is fast.
+# It persists in ~/.cache/camoufox between runs, so the workflow's fetch step
+# is a no-op thereafter. (We rely on this local cache rather than actions/cache,
+# which on a self-hosted runner would shuttle ~650MB to/from GitHub each run.)
+npx camoufox-js fetch
 ```
 
 Hardening notes (the repo is public):
