@@ -5,11 +5,8 @@ on:
 
 name: Build and deploy website
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+# No default permissions; each job is granted only what it needs below.
+permissions: {}
 
 # Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
 # However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
@@ -20,7 +17,15 @@ concurrency:
 jobs:
   build:
     name: Build site
-    runs-on: ubuntu-latest
+    # Runs on a self-hosted runner so the scrape goes out over a residential IP
+    # (GitHub-hosted datacenter IPs are flagged by Cloudflare). The runner needs
+    # Firefox's system libraries and Xvfb pre-installed (see README); they are
+    # deliberately NOT installed here so the nightly run doesn't mutate the host.
+    runs-on: [self-hosted, vo-films-runner]
+    # Read-only token: the build never needs write access, and this keeps any
+    # Pages/deploy credentials off the self-hosted (home-network) runner.
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,14 +33,9 @@ jobs:
         with:
           node-version-file: .node-version
       - run: npm ci
-      # Camoufox is a Firefox build, so it needs Firefox's system libraries plus
-      # Xvfb for the headless: "virtual" display used in CI.
-      - name: Install browser system dependencies
-        run: |
-          npx playwright install-deps firefox
-          sudo apt-get install -y xvfb
-      # Cache the ~311MB Camoufox browser + GeoIP DB so it isn't re-downloaded
-      # on every scheduled run. fetch is a no-op when the cache is restored.
+      # Cache the ~311MB Camoufox browser + GeoIP DB (user-space, no sudo) so it
+      # isn't re-downloaded each run - matters especially for ephemeral runners.
+      # fetch is a no-op when the cache is restored.
       - name: Cache Camoufox browser
         uses: actions/cache@v4
         with:
@@ -50,11 +50,16 @@ jobs:
 
   deploy:
     name: Deploy site
+    # Stays on a GitHub-hosted runner so the Pages deploy credentials never
+    # touch the self-hosted runner. Consumes the artifact uploaded by `build`.
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
