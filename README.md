@@ -35,7 +35,7 @@ provisioning the runner (Debian/Ubuntu):
 ```bash
 # Firefox system libraries (Camoufox is Firefox-based) + Xvfb for the
 # headless: "virtual" display the scrape uses in CI.
-sudo npx playwright@latest install-deps firefox
+npx playwright@latest install-deps firefox
 sudo apt-get install -y xvfb
 ```
 
