@@ -46,5 +46,13 @@
   "le-familia-quillan": {
     "homepage": "https://www.quillan.fr/cinema-le-familia/",
     "distance": 27
+  },
+  "salle-des-fetes-1": {
+    "homepage": "https://www.saintpaulenforet.fr/demarche-information/location-de-salle-communale/",
+    "distance": 77
+  },
+  "palace-lezignan-corbieres": {
+    "homepage": "https://www.cinemaude.org/movie-theater/lezignan-corbieres-le-palace",
+    "distance": 65
   }
 }

@@ -28,8 +28,8 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+        uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
         with:
           node-version-file: .node-version
       - run: npm ci
@@ -37,14 +37,14 @@ jobs:
       # isn't re-downloaded each run - matters especially for ephemeral runners.
       # fetch is a no-op when the cache is restored.
       - name: Cache Camoufox browser
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/camoufox
           key: camoufox-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: Fetch Camoufox browser
         run: npx camoufox-js fetch
       - run: npm run build
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: ./site
 
@@ -63,4 +63,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
