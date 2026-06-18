@@ -3,6 +3,8 @@ const cheerio = require("cheerio");
 // non-Chromium engine sidesteps the Cloudflare automation detection that none
 // of our Chromium-based attempts (stealth plugin, patchright) could clear -
 // that detection is what made the Turnstile checkbox loop endlessly.
+// (camoufox-js is ESM-only; requires Node >=22.12 / 24 to require() it - see
+// .node-version.)
 const { Camoufox } = require("camoufox-js");
 const { addDays, format } = require("date-fns");
 const staticData = require("./data.json");
