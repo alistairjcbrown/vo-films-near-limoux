@@ -1,25 +1,94 @@
 const cheerio = require("cheerio");
-const { chromium } = require("playwright-extra");
+// Camoufox is a hardened Firefox build with deep anti-fingerprinting. Using a
+// non-Chromium engine sidesteps the Cloudflare automation detection that none
+// of our Chromium-based attempts (stealth plugin, patchright) could clear -
+// that detection is what made the Turnstile checkbox loop endlessly.
+const { Camoufox } = require("camoufox-js");
 const { addDays, format } = require("date-fns");
 const staticData = require("./data.json");
-const stealth = require("puppeteer-extra-plugin-stealth")();
-chromium.use(stealth);
+
+const CLOUDFLARE_TIMEOUT_MS = 30000;
+
+// Cloudflare's interstitial ("Just a moment...") and Turnstile widget render
+// before the real page. Detect them so we can wait for the challenge to clear
+// rather than scraping an empty challenge page.
+async function isCloudflareChallenge(page) {
+  return page.evaluate(() => {
+    // window._cf_chl_opt is defined inline on every Cloudflare challenge page
+    // and is locale-independent, unlike the "Just a moment..." title which is
+    // translated (e.g. to French) and so can't be matched on reliably.
+    if (window._cf_chl_opt) return true;
+    return Boolean(
+      document.querySelector(
+        "#challenge-running, #challenge-stage, #challenge-error-text, " +
+          ".cf-turnstile, " +
+          'script[src*="/cdn-cgi/challenge-platform/"], ' +
+          'iframe[src*="challenges.cloudflare.com"]',
+      ),
+    );
+  });
+}
+
+async function waitForCloudflare(page) {
+  if (!(await isCloudflareChallenge(page))) return;
+  console.error("Cloudflare challenge detected, waiting for it to clear...");
+  const deadline = Date.now() + CLOUDFLARE_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    await page.waitForTimeout(1000);
+    if (!(await isCloudflareChallenge(page))) {
+      console.error("Cloudflare challenge cleared.");
+      return;
+    }
+  }
+  throw new Error(
+    `Cloudflare challenge did not clear within ${CLOUDFLARE_TIMEOUT_MS}ms for ${page.url()}`,
+  );
+}
+
+// A single Camoufox browser/context is shared across all page fetches so a
+// cleared Cloudflare challenge (and its cookies) carries over between venues
+// instead of being re-solved for each one.
+let contextPromise;
+
+function getContext() {
+  if (!contextPromise) {
+    contextPromise = (async () => {
+      const browser = await Camoufox({
+        // Locally show the real window; in CI (no display) use Camoufox's
+        // built-in virtual display (Xvfb) - a real headed Firefox inside a
+        // virtual framebuffer, which is far less detectable than true headless.
+        headless: process.env.CI ? "virtual" : false,
+        // Derive a self-consistent locale, timezone and geolocation from the
+        // real outbound IP rather than forcing values that might mismatch it.
+        geoip: true,
+        // Human-like cursor movement helps clear interactive Turnstile widgets.
+        humanize: true,
+      });
+      // viewport: null uses Camoufox's real window size; a pinned viewport both
+      // leaks automation and is rejected by Camoufox's patched Firefox build.
+      return browser.newContext({ viewport: null });
+    })();
+  }
+  return contextPromise;
+}
+
+async function closeBrowser() {
+  if (!contextPromise) return;
+  const context = await contextPromise;
+  contextPromise = undefined;
+  await context.browser().close();
+}
 
 async function getPageWithPlaywright(url) {
-  const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext();
+  const context = await getContext();
   const page = await context.newPage();
-  await page.setViewportSize({ width: 1280, height: 720 });
   try {
     await page.goto(url);
     await page.waitForLoadState();
-    const result = await page.content();
-    await browser.close();
-    return result;
-  } catch (error) {
-    throw error;
+    await waitForCloudflare(page);
+    return await page.content();
   } finally {
-    await browser.close();
+    await page.close();
   }
 }
 
@@ -44,6 +113,13 @@ async function getVenues(url) {
     if (match) [, name, location] = match;
     venues.push({ id, name, location, url });
   });
+
+  if (venues.length === 0) {
+    throw new Error(
+      `No venues found at ${url} - the page may be blocked or its structure may have changed`,
+    );
+  }
+
   return venues;
 }
 
@@ -59,8 +135,9 @@ function getShowingFor($showingEl, $movieEl) {
 
 async function getShowings({ url }) {
   const $ = await getPage(url);
+  const $seances = $(".seance-langue");
   const showings = [];
-  $(".seance-langue").each(function (index) {
+  $seances.each(function (index) {
     if ($(this).text().trim().toLowerCase() === "vo") {
       const showing = getShowingFor($(this), $(this).parents("li"), index);
       if (Date.now() < new Date(`${showing.date}T${showing.time}`)) {
@@ -68,21 +145,39 @@ async function getShowings({ url }) {
       }
     }
   });
-  return showings.sort(
-    (a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`),
-  );
+  return {
+    // Total seance elements (any language) tells us the page loaded real
+    // programmation data, distinguishing a genuine "no VO" day from a blocked
+    // or structurally-changed page that yields nothing at all.
+    seanceCount: $seances.length,
+    showings: showings.sort(
+      (a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`),
+    ),
+  };
 }
 
 async function main(url) {
-  const venues = await getVenues(url);
-  const venueShowings = [];
-  for (venue of venues) {
-    const showings = await getShowings(venue);
-    venueShowings.push({ ...venue, ...staticData[venue.id], showings });
+  try {
+    const venues = await getVenues(url);
+    const venueShowings = [];
+    let totalSeances = 0;
+    for (venue of venues) {
+      const { showings, seanceCount } = await getShowings(venue);
+      totalSeances += seanceCount;
+      venueShowings.push({ ...venue, ...staticData[venue.id], showings });
+    }
+    if (totalSeances === 0) {
+      throw new Error(
+        `No showings of any language found across all ${venues.length} venue(s) - ` +
+          `the pages may be blocked or the HTML structure may have changed`,
+      );
+    }
+    return venueShowings.sort(
+      (a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity),
+    );
+  } finally {
+    await closeBrowser();
   }
-  return venueShowings.sort(
-    (a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity),
-  );
 }
 
 module.exports = main;

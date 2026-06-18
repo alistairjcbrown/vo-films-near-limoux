@@ -28,7 +28,21 @@ jobs:
         with:
           node-version-file: .node-version
       - run: npm ci
-      - run: npx playwright install --with-deps
+      # Camoufox is a Firefox build, so it needs Firefox's system libraries plus
+      # Xvfb for the headless: "virtual" display used in CI.
+      - name: Install browser system dependencies
+        run: |
+          npx playwright install-deps firefox
+          sudo apt-get install -y xvfb
+      # Cache the ~311MB Camoufox browser + GeoIP DB so it isn't re-downloaded
+      # on every scheduled run. fetch is a no-op when the cache is restored.
+      - name: Cache Camoufox browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/camoufox
+          key: camoufox-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Fetch Camoufox browser
+        run: npx camoufox-js fetch
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3
         with:
