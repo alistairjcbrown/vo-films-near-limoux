@@ -26,6 +26,14 @@ jobs:
     # Pages/deploy credentials off the self-hosted (home-network) runner.
     permissions:
       contents: read
+    env:
+      # The Camoufox browser is PINNED and provisioned manually on the runner
+      # (see README). By default camoufox-js auto-installs the newest GitHub
+      # release *including prereleases*, and a broken arm64 alpha has shipped
+      # (extracts to fonts/config with no browser binary), silently breaking the
+      # build. This flag stops camoufox-js touching the pinned browser at all,
+      # and makes it skip the (optional) addon download gracefully at launch.
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -33,14 +41,17 @@ jobs:
         with:
           node-version-file: .node-version
       - run: npm ci
-      # The persistent self-hosted runner keeps ~/.cache/camoufox on its own
-      # disk between runs, so this is a near-instant no-op after the first run
-      # (and self-heals if the browser is ever missing). We deliberately do NOT
-      # use actions/cache here: on a self-hosted runner that would download and
-      # re-upload the ~650MB browser to GitHub's cache over the host's own
-      # connection every run, which is slower than just reusing the local copy.
-      - name: Fetch Camoufox browser
-        run: npx camoufox-js fetch
+      # Fail loudly if the manually-pinned browser is incomplete, rather than
+      # letting the scrape blow up mid-run. These three files are all a launch
+      # needs (browser binary, version metadata, and the GeoIP db for geoip:true;
+      # addons are skipped via the flag above). We deliberately do NOT run
+      # `camoufox-js fetch` here - it would try to replace the pin with the
+      # newest (possibly broken) release.
+      - name: Verify pinned Camoufox is installed
+        run: |
+          test -f ~/.cache/camoufox/camoufox-bin
+          test -f ~/.cache/camoufox/version.json
+          test -f ~/.cache/camoufox/GeoLite2-City.mmdb
       - run: npm run build
       - uses: actions/upload-pages-artifact@v5
         with:
