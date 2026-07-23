@@ -6,7 +6,6 @@ const cheerio = require("cheerio");
 // (camoufox-js is ESM-only; requires Node >=22.12 / 24 to require() it - see
 // .node-version.)
 const { Camoufox } = require("camoufox-js");
-const { addDays, format } = require("date-fns");
 const staticData = require("./data.json");
 
 const CLOUDFLARE_TIMEOUT_MS = 30000;
@@ -125,36 +124,62 @@ async function getVenues(url) {
   return venues;
 }
 
-function getShowingFor($showingEl, $movieEl) {
-  const $tabPane = $showingEl.parents(".tab-pane");
-  const index = $tabPane.parent().find(".tab-pane").index($tabPane);
-  const date = format(addDays(new Date(), index), "yyyy-MM-dd");
-  const time = $showingEl.parents("button").find(".seance-time").text().trim();
+// A seance element we can find but can't read is always a bug, never a real
+// state of the page - so treat any missing field as a structural change and
+// throw. Without this, an unreadable field just yields an unparseable date, the
+// showing silently fails the "is it in the future" filter, and we publish a page
+// claiming there are no VO films at all.
+function getShowingFor($showingEl, $movieEl, url) {
+  // Each day's showings sit in a tab pane whose id ends in the ISO date, e.g.
+  // "seances-3-2026-07-23". Reading it beats counting the pane's position among
+  // its siblings, which silently skews if a day is ever omitted.
+  const paneId = $showingEl.parents(".tab-pane").attr("id") ?? "";
+  const [date] = paneId.match(/\d{4}-\d{2}-\d{2}$/) ?? [];
+  // The showing is a single <li> holding both the time and the language.
+  const time = $showingEl.closest("li").find(".seance-time").text().trim();
   const title = $movieEl.find('meta[itemprop="name"]').attr("content");
   const id = $movieEl.children("span").attr("id");
-  return { id, title, date, time };
+  const language = $showingEl.text().trim().toLowerCase();
+
+  const showing = { id, title, date, time, language };
+  const missing = Object.keys(showing).filter((key) => !showing[key]);
+  const startsAt = new Date(`${date}T${time}`);
+  if (missing.length > 0 || Number.isNaN(startsAt.getTime())) {
+    throw new Error(
+      `Could not read ${missing.length > 0 ? missing.join(", ") : "a valid date/time"} ` +
+        `from a seance on ${url} - the HTML structure has likely changed.\n` +
+        `Parsed: ${JSON.stringify(showing)}\n` +
+        `Seance HTML: ${$showingEl.closest("li").toString()}`,
+    );
+  }
+
+  return { ...showing, startsAt };
 }
 
 async function getShowings({ url }) {
   const $ = await getPage(url);
   const $seances = $(".seance-langue");
-  const showings = [];
-  $seances.each(function (index) {
-    if ($(this).text().trim().toLowerCase() === "vo") {
-      const showing = getShowingFor($(this), $(this).parents("li"), index);
-      if (Date.now() < new Date(`${showing.date}T${showing.time}`)) {
-        showings.push(showing);
-      }
-    }
-  });
+  // Parse every seance, not just the VO ones, so the checks in getShowingFor
+  // still run on a day when nothing happens to be showing in VO.
+  const seances = $seances
+    .map((index, el) =>
+      getShowingFor($(el), $(el).closest("li[data-movie-slug]"), url),
+    )
+    .get();
+
+  const showings = seances
+    .filter(
+      ({ language, startsAt }) => language === "vo" && Date.now() < startsAt,
+    )
+    .sort((a, b) => a.startsAt - b.startsAt)
+    .map(({ id, title, date, time }) => ({ id, title, date, time }));
+
   return {
     // Total seance elements (any language) tells us the page loaded real
     // programmation data, distinguishing a genuine "no VO" day from a blocked
     // or structurally-changed page that yields nothing at all.
     seanceCount: $seances.length,
-    showings: showings.sort(
-      (a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`),
-    ),
+    showings,
   };
 }
 
