@@ -55,6 +55,24 @@ const Page = (...content) => {
 </head>
 <body>
 ${content.join("\n")}
+
+<script>
+  let loadedDate = new Date().toDateString();
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      const currentDate = new Date().toDateString();
+      if (currentDate !== loadedDate) {
+        const shouldRefresh = confirm('New data is available. Refresh now?');
+        if (shouldRefresh) {
+          location.reload();
+        } else {
+          loadedDate = currentDate; // don't ask again today
+        }
+      }
+    }
+  });
+</script>
 </body>
 </html>
 `;
