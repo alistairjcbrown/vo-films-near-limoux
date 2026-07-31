@@ -57,19 +57,33 @@ const Page = (...content) => {
 ${content.join("\n")}
 
 <script>
-  let loadedDate = new Date().toDateString();
+  function checkForNewDay() {
+    const currentDate = new Date().toDateString();
+    const storedDate = localStorage.getItem('lastSeenDate');
+    if (storedDate && storedDate !== currentDate) {
+      const shouldRefresh = confirm('New data is available. Refresh now?');
+      if (shouldRefresh) {
+        location.reload();
+        return;
+      }
+    }
+    localStorage.setItem('lastSeenDate', currentDate);
+  }
 
+  // Fresh load: data is already current, just record the date, no check
+  localStorage.setItem('lastSeenDate', new Date().toDateString());
+
+  // Restored from bfcache (e.g. tapping home-screen icon reopens a cached page)
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) {
+      checkForNewDay();
+    }
+  });
+
+  // Tab/app brought back to foreground without a reload
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
-      const currentDate = new Date().toDateString();
-      if (currentDate !== loadedDate) {
-        const shouldRefresh = confirm('New data is available. Refresh now?');
-        if (shouldRefresh) {
-          location.reload();
-        } else {
-          loadedDate = currentDate; // don't ask again today
-        }
-      }
+      checkForNewDay();
     }
   });
 </script>
