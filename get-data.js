@@ -124,17 +124,47 @@ async function getVenues(url) {
   return venues;
 }
 
+// The day bar at the top of the page is the only place each day's ISO date
+// appears; the per-movie panes below carry just the weekday name. Build the
+// name -> date map once per page. The window is seven days, so weekday names
+// are unambiguous. (Other elements reuse the .dayselector class without a
+// date - the "prochaine seance le Samedi" buttons - hence the attribute
+// selector and the .jours-bar scope.)
+function getDatesByDay($, url) {
+  const datesByDay = new Map();
+  $(".jours-bar .dayselector[data-day][data-date]").each(function () {
+    datesByDay.set(
+      $(this).attr("data-day").toLowerCase(),
+      $(this).attr("data-date"),
+    );
+  });
+
+  if (datesByDay.size === 0) {
+    throw new Error(
+      `No day/date bar found on ${url} - the page may be blocked or the HTML ` +
+        `structure may have changed`,
+    );
+  }
+
+  return datesByDay;
+}
+
 // A seance element we can find but can't read is always a bug, never a real
 // state of the page - so treat any missing field as a structural change and
 // throw. Without this, an unreadable field just yields an unparseable date, the
 // showing silently fails the "is it in the future" filter, and we publish a page
 // claiming there are no VO films at all.
-function getShowingFor($showingEl, $movieEl, url) {
-  // Each day's showings sit in a tab pane whose id ends in the ISO date, e.g.
-  // "seances-3-2026-07-23". Reading it beats counting the pane's position among
-  // its siblings, which silently skews if a day is ever omitted.
-  const paneId = $showingEl.parents(".tab-pane").attr("id") ?? "";
-  const [date] = paneId.match(/\d{4}-\d{2}-\d{2}$/) ?? [];
+function getShowingFor($showingEl, $movieEl, datesByDay, url) {
+  // Each day's showings sit in a tab pane tagged only with the French weekday
+  // name, e.g. "tab-pane lesseances Mardi" - the ISO date lives solely in the
+  // day bar, hence the lookup. Matching on the name beats counting the pane's
+  // position among its siblings, which silently skews if a day is ever omitted.
+  const paneClasses = (
+    $showingEl.closest(".tab-pane").attr("class") ?? ""
+  ).split(/\s+/);
+  const date = paneClasses
+    .map((className) => datesByDay.get(className.toLowerCase()))
+    .find(Boolean);
   // The showing is a single <li> holding both the time and the language.
   const time = $showingEl.closest("li").find(".seance-time").text().trim();
   const title = $movieEl.find('meta[itemprop="name"]').attr("content");
@@ -158,12 +188,18 @@ function getShowingFor($showingEl, $movieEl, url) {
 
 async function getShowings({ url }) {
   const $ = await getPage(url);
+  const datesByDay = getDatesByDay($, url);
   const $seances = $(".seance-langue");
   // Parse every seance, not just the VO ones, so the checks in getShowingFor
   // still run on a day when nothing happens to be showing in VO.
   const seances = $seances
     .map((index, el) =>
-      getShowingFor($(el), $(el).closest("li[data-movie-slug]"), url),
+      getShowingFor(
+        $(el),
+        $(el).closest("li[data-movie-slug]"),
+        datesByDay,
+        url,
+      ),
     )
     .get();
 
