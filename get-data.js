@@ -9,6 +9,7 @@ const { Camoufox } = require("camoufox-js");
 const staticData = require("./data.json");
 
 const CLOUDFLARE_TIMEOUT_MS = 30000;
+const CONTENT_TIMEOUT_MS = 30000;
 
 // Cloudflare's interstitial ("Just a moment...") and Turnstile widget render
 // before the real page. Detect them so we can wait for the challenge to clear
@@ -80,29 +81,44 @@ async function closeBrowser() {
   await context.browser().close();
 }
 
-async function getPageWithPlaywright(url) {
+// Clearing the challenge navigates to the real page, which then streams in - so
+// the instant the challenge markers vanish the document is typically still
+// parsing (readyState "interactive", roughly half its final size). Snapshotting
+// there yields a truncated page whose later sections simply aren't there yet,
+// which reads exactly like the site having changed shape. Wait for a selector
+// the caller actually needs - that also pins us to the right document, since a
+// load state alone can be satisfied by the challenge page we're navigating away
+// from - and only then for parsing to finish.
+async function getPageWithPlaywright(url, readySelector) {
   const context = await getContext();
   const page = await context.newPage();
   try {
     await page.goto(url);
     await page.waitForLoadState();
     await waitForCloudflare(page);
+    await page.waitForSelector(readySelector, {
+      state: "attached",
+      timeout: CONTENT_TIMEOUT_MS,
+    });
+    await page.waitForLoadState();
     return await page.content();
   } finally {
     await page.close();
   }
 }
 
-async function getPage(url) {
-  const data = await getPageWithPlaywright(url);
+async function getPage(url, readySelector) {
+  const data = await getPageWithPlaywright(url, readySelector);
   return cheerio.load(data);
 }
 
+const VENUES_SELECTOR = ".list_cities a";
+
 async function getVenues(url) {
-  const $ = await getPage(url);
+  const $ = await getPage(url, VENUES_SELECTOR);
 
   const venues = [];
-  $(".list_cities a").each(function () {
+  $(VENUES_SELECTOR).each(function () {
     const url = $(this).attr("href");
     const [, id] = url.match(
       /https:\/\/www.cinefil.com\/cinema\/([^/]+)\/programmation/,
@@ -130,9 +146,11 @@ async function getVenues(url) {
 // are unambiguous. (Other elements reuse the .dayselector class without a
 // date - the "prochaine seance le Samedi" buttons - hence the attribute
 // selector and the .jours-bar scope.)
+const DAY_BAR_SELECTOR = ".jours-bar .dayselector[data-day][data-date]";
+
 function getDatesByDay($, url) {
   const datesByDay = new Map();
-  $(".jours-bar .dayselector[data-day][data-date]").each(function () {
+  $(DAY_BAR_SELECTOR).each(function () {
     datesByDay.set(
       $(this).attr("data-day").toLowerCase(),
       $(this).attr("data-date"),
@@ -187,7 +205,7 @@ function getShowingFor($showingEl, $movieEl, datesByDay, url) {
 }
 
 async function getShowings({ url }) {
-  const $ = await getPage(url);
+  const $ = await getPage(url, DAY_BAR_SELECTOR);
   const datesByDay = getDatesByDay($, url);
   const $seances = $(".seance-langue");
   // Parse every seance, not just the VO ones, so the checks in getShowingFor
