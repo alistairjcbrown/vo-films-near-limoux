@@ -41,6 +41,9 @@ jobs:
         with:
           node-version-file: .node-version
       - run: npm ci
+      # Parser tests against saved Cinefil pages - cheap, offline, and catch a
+      # broken parser before we spend a scrape on it.
+      - run: npm test
       # Fail loudly if the manually-pinned browser is incomplete, rather than
       # letting the scrape blow up mid-run. These three files are all a launch
       # needs (browser binary, version metadata, and the GeoIP db for geoip:true;

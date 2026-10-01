@@ -1,6 +1,5 @@
 const fs = require("fs");
 const path = require("path");
-const cheerio = require("cheerio");
 // Camoufox is a hardened Firefox build with deep anti-fingerprinting. Using a
 // non-Chromium engine sidesteps the Cloudflare automation detection that none
 // of our Chromium-based attempts (stealth plugin, patchright) could clear -
@@ -9,6 +8,13 @@ const cheerio = require("cheerio");
 // .node-version.)
 const { Camoufox } = require("camoufox-js");
 const staticData = require("./data.json");
+const {
+  VENUES_SELECTOR,
+  DAY_BAR_SELECTOR,
+  parseVenues,
+  parseSeances,
+  upcomingVoShowings,
+} = require("./parse");
 
 const CLOUDFLARE_TIMEOUT_MS = 30000;
 const CONTENT_TIMEOUT_MS = 30000;
@@ -133,141 +139,21 @@ async function getPageWithPlaywright(url, readySelector) {
   }
 }
 
-async function getPage(url, readySelector) {
-  const data = await getPageWithPlaywright(url, readySelector);
-  return cheerio.load(data);
-}
-
-const VENUES_SELECTOR = ".adresses a.fiche-cinema-minia";
-
 async function getVenues(url) {
-  const $ = await getPage(url, VENUES_SELECTOR);
-
-  const venues = [];
-  $(VENUES_SELECTOR).each(function () {
-    const url = $(this).attr("href");
-    const [, id] = url.match(
-      /https:\/\/www.cinefil.com\/cinema\/([^/]+)\/programmation/,
-    );
-    // The programmation link is now a thumbnail with no text; the venue's
-    // "Name (Location)" label lives in the heading of the same .row.
-    const value = $(this).closest(".row").find("h3 > a").first().text().trim();
-    if (!value) {
-      throw new Error(
-        `Could not read a venue name for ${url} on the venues page - the HTML ` +
-          `structure has likely changed`,
-      );
-    }
-    const match = value.match(/^([^(]+)\s+\(([^)]+)\)$/);
-    let name = value;
-    let location = "Limoux";
-    if (match) [, name, location] = match;
-    venues.push({ id, name, location, url });
-  });
-
-  if (venues.length === 0) {
-    throw new Error(
-      `No venues found at ${url} - the page may be blocked or its structure may have changed`,
-    );
-  }
-
-  return venues;
-}
-
-// The day bar at the top of the page is the only place each day's ISO date
-// appears; the per-movie panes below carry just the weekday name. Build the
-// name -> date map once per page. The window is seven days, so weekday names
-// are unambiguous. (Other elements reuse the .dayselector class without a
-// date - the "prochaine seance le Samedi" buttons - hence the attribute
-// selector and the .jours-bar scope.)
-const DAY_BAR_SELECTOR = ".jours-bar .dayselector[data-day][data-date]";
-
-function getDatesByDay($, url) {
-  const datesByDay = new Map();
-  $(DAY_BAR_SELECTOR).each(function () {
-    datesByDay.set(
-      $(this).attr("data-day").toLowerCase(),
-      $(this).attr("data-date"),
-    );
-  });
-
-  if (datesByDay.size === 0) {
-    throw new Error(
-      `No day/date bar found on ${url} - the page may be blocked or the HTML ` +
-        `structure may have changed`,
-    );
-  }
-
-  return datesByDay;
-}
-
-// A seance element we can find but can't read is always a bug, never a real
-// state of the page - so treat any missing field as a structural change and
-// throw. Without this, an unreadable field just yields an unparseable date, the
-// showing silently fails the "is it in the future" filter, and we publish a page
-// claiming there are no VO films at all.
-function getShowingFor($showingEl, $movieEl, datesByDay, url) {
-  // Each day's showings sit in a tab pane tagged only with the French weekday
-  // name, e.g. "tab-pane lesseances Mardi" - the ISO date lives solely in the
-  // day bar, hence the lookup. Matching on the name beats counting the pane's
-  // position among its siblings, which silently skews if a day is ever omitted.
-  const paneClasses = (
-    $showingEl.closest(".tab-pane").attr("class") ?? ""
-  ).split(/\s+/);
-  const date = paneClasses
-    .map((className) => datesByDay.get(className.toLowerCase()))
-    .find(Boolean);
-  // The showing is a single <li> holding both the time and the language.
-  const time = $showingEl.closest("li").find(".seance-time").text().trim();
-  const title = $movieEl.find('meta[itemprop="name"]').attr("content");
-  const id = $movieEl.children("span").attr("id");
-  const language = $showingEl.text().trim().toLowerCase();
-
-  const showing = { id, title, date, time, language };
-  const missing = Object.keys(showing).filter((key) => !showing[key]);
-  const startsAt = new Date(`${date}T${time}`);
-  if (missing.length > 0 || Number.isNaN(startsAt.getTime())) {
-    throw new Error(
-      `Could not read ${missing.length > 0 ? missing.join(", ") : "a valid date/time"} ` +
-        `from a seance on ${url} - the HTML structure has likely changed.\n` +
-        `Parsed: ${JSON.stringify(showing)}\n` +
-        `Seance HTML: ${$showingEl.closest("li").toString()}`,
-    );
-  }
-
-  return { ...showing, startsAt };
+  return parseVenues(await getPageWithPlaywright(url, VENUES_SELECTOR), url);
 }
 
 async function getShowings({ url }) {
-  const $ = await getPage(url, DAY_BAR_SELECTOR);
-  const datesByDay = getDatesByDay($, url);
-  const $seances = $(".seance-langue");
-  // Parse every seance, not just the VO ones, so the checks in getShowingFor
-  // still run on a day when nothing happens to be showing in VO.
-  const seances = $seances
-    .map((index, el) =>
-      getShowingFor(
-        $(el),
-        $(el).closest("li[data-movie-slug]"),
-        datesByDay,
-        url,
-      ),
-    )
-    .get();
-
-  const showings = seances
-    .filter(
-      ({ language, startsAt }) => language === "vo" && Date.now() < startsAt,
-    )
-    .sort((a, b) => a.startsAt - b.startsAt)
-    .map(({ id, title, date, time }) => ({ id, title, date, time }));
-
+  const seances = parseSeances(
+    await getPageWithPlaywright(url, DAY_BAR_SELECTOR),
+    url,
+  );
   return {
-    // Total seance elements (any language) tells us the page loaded real
-    // programmation data, distinguishing a genuine "no VO" day from a blocked
-    // or structurally-changed page that yields nothing at all.
-    seanceCount: $seances.length,
-    showings,
+    // Total seances (any language) tells us the page loaded real programmation
+    // data, distinguishing a genuine "no VO" day from a blocked or
+    // structurally-changed page that yields nothing at all.
+    seanceCount: seances.length,
+    showings: upcomingVoShowings(seances),
   };
 }
 
@@ -278,7 +164,13 @@ async function main(url) {
     const venues = await getVenues(url);
     const venueShowings = [];
     let totalSeances = 0;
-    for (venue of venues) {
+    for (const venue of venues) {
+      if (!staticData[venue.id]) {
+        console.warn(
+          `Venue "${venue.id}" (${venue.name}, ${venue.location}) has no entry ` +
+            `in data.json, so it will have no distance or homepage - add one.`,
+        );
+      }
       const { showings, seanceCount } = await getShowings(venue);
       totalSeances += seanceCount;
       venueShowings.push({ ...venue, ...staticData[venue.id], showings });
