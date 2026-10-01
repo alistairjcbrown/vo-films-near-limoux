@@ -112,7 +112,7 @@ async function getPage(url, readySelector) {
   return cheerio.load(data);
 }
 
-const VENUES_SELECTOR = ".list_cities a";
+const VENUES_SELECTOR = ".adresses a.fiche-cinema-minia";
 
 async function getVenues(url) {
   const $ = await getPage(url, VENUES_SELECTOR);
