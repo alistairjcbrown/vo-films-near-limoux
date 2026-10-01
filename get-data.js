@@ -123,7 +123,15 @@ async function getVenues(url) {
     const [, id] = url.match(
       /https:\/\/www.cinefil.com\/cinema\/([^/]+)\/programmation/,
     );
-    const value = $(this).text().trim();
+    // The programmation link is now a thumbnail with no text; the venue's
+    // "Name (Location)" label lives in the heading of the same .row.
+    const value = $(this).closest(".row").find("h3 > a").first().text().trim();
+    if (!value) {
+      throw new Error(
+        `Could not read a venue name for ${url} on the venues page - the HTML ` +
+          `structure has likely changed`,
+      );
+    }
     const match = value.match(/^([^(]+)\s+\(([^)]+)\)$/);
     let name = value;
     let location = "Limoux";
