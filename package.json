@@ -3,7 +3,8 @@
   "private": true,
   "main": "index.js",
   "scripts": {
-    "build": "TZ=Europe/Paris node ./index.js"
+    "build": "TZ=Europe/Paris node ./index.js",
+    "test": "TZ=Europe/Paris node --test"
   },
   "author": "",
   "license": "ISC",

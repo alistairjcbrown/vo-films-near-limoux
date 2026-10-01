@@ -22,6 +22,25 @@ scrape loads is saved to `./page-snapshots/` (as it was left, even if the scrape
 failed on it). CI uploads these as the `page-snapshots` artifact of each run,
 kept for 14 days, to debug markup changes and test parser fixes against.
 
+## Tests
+
+Parsing lives in [`parse.js`](parse.js), separate from the browser fetching in
+`get-data.js`, and is tested offline against real saved pages in
+[`test/fixtures`](test/fixtures):
+
+```bash
+npm test
+```
+
+When Cinefil's markup changes, download the `page-snapshots` artifact from a
+run, refresh the fixtures from it (this strips scripts, menus, ads etc. to keep
+them small), then fix the parser until the tests pass, updating any expected
+values that legitimately changed:
+
+```bash
+node scripts/update-fixtures.js ~/Downloads/page-snapshots/{seances-cinema_limoux-11,cinema_elysee-limoux_programmation,cinema_colisee-carcassonne_programmation,cinema_le-familia-quillan_programmation}.html
+```
+
 ## Local development
 
 ```bash
