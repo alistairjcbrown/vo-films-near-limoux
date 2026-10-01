@@ -53,6 +53,17 @@ jobs:
           test -f ~/.cache/camoufox/version.json
           test -f ~/.cache/camoufox/GeoLite2-City.mmdb
       - run: npm run build
+      # Keep the raw HTML of every page the scrape loaded - especially when it
+      # fails - so there's real markup to debug and test parser fixes against.
+      # The site is behind Cloudflare, so this runner is the only place that
+      # can reliably fetch it.
+      - name: Upload page snapshots
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: page-snapshots
+          path: ./page-snapshots
+          retention-days: 14
       - uses: actions/upload-pages-artifact@v5
         with:
           path: ./site

@@ -17,6 +17,11 @@ Cloudflare also flags GitHub-hosted (datacenter) IPs, so the **build job runs on
 a self-hosted runner** on a residential IP. Deployment stays on a GitHub-hosted
 runner so the Pages credentials never touch the self-hosted machine.
 
+Because the pages can't easily be fetched from anywhere else, every page the
+scrape loads is saved to `./page-snapshots/` (as it was left, even if the scrape
+failed on it). CI uploads these as the `page-snapshots` artifact of each run,
+kept for 14 days, to debug markup changes and test parser fixes against.
+
 ## Local development
 
 ```bash

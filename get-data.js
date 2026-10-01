@@ -1,3 +1,5 @@
+const fs = require("fs");
+const path = require("path");
 const cheerio = require("cheerio");
 // Camoufox is a hardened Firefox build with deep anti-fingerprinting. Using a
 // non-Chromium engine sidesteps the Cloudflare automation detection that none
@@ -10,6 +12,11 @@ const staticData = require("./data.json");
 
 const CLOUDFLARE_TIMEOUT_MS = 30000;
 const CONTENT_TIMEOUT_MS = 30000;
+
+// Every page we load is saved here (and uploaded as a CI artifact) so the real
+// markup is on hand to debug and test against - the site sits behind
+// Cloudflare, so it can't simply be fetched from elsewhere after the fact.
+const SNAPSHOT_DIR = path.join(__dirname, "page-snapshots");
 
 // Cloudflare's interstitial ("Just a moment...") and Turnstile widget render
 // before the real page. Detect them so we can wait for the challenge to clear
@@ -81,6 +88,22 @@ async function closeBrowser() {
   await context.browser().close();
 }
 
+// Best-effort: a snapshot failing must never mask the scrape's own outcome.
+async function savePageSnapshot(page, url) {
+  try {
+    const name = new URL(url).pathname
+      .replace(/^\/|\/$/g, "")
+      .replace(/\//g, "_");
+    fs.mkdirSync(SNAPSHOT_DIR, { recursive: true });
+    fs.writeFileSync(
+      path.join(SNAPSHOT_DIR, `${name || "index"}.html`),
+      await page.content(),
+    );
+  } catch (error) {
+    console.error(`Could not save a snapshot of ${url}: ${error.message}`);
+  }
+}
+
 // Clearing the challenge navigates to the real page, which then streams in - so
 // the instant the challenge markers vanish the document is typically still
 // parsing (readyState "interactive", roughly half its final size). Snapshotting
@@ -103,6 +126,9 @@ async function getPageWithPlaywright(url, readySelector) {
     await page.waitForLoadState();
     return await page.content();
   } finally {
+    // Runs on failure too, so a timed-out page (e.g. after a markup change, or
+    // a Cloudflare challenge that never cleared) is captured as it was left.
+    await savePageSnapshot(page, url);
     await page.close();
   }
 }
@@ -246,6 +272,8 @@ async function getShowings({ url }) {
 }
 
 async function main(url) {
+  // Start clean so the snapshots only ever reflect this run.
+  fs.rmSync(SNAPSHOT_DIR, { recursive: true, force: true });
   try {
     const venues = await getVenues(url);
     const venueShowings = [];

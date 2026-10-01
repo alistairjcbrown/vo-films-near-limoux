@@ -133,3 +133,6 @@ dist
 
 # macOS
 .DS_Store
+
+# Raw HTML of scraped pages (uploaded as a CI artifact)
+page-snapshots/
