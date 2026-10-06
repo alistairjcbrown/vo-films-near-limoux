@@ -3,7 +3,11 @@
 // against saved pages - see test/fixtures.
 const cheerio = require("cheerio");
 
-const VENUES_SELECTOR = ".adresses a.fiche-cinema-minia";
+// Each venue row (div.theater-sum) sits in a .ville-salles list - one for the
+// town's own cinemas and one for those nearby. The sections wrapping those
+// lists have changed before (.adresses until October 2026), so don't rely on
+// them.
+const VENUES_SELECTOR = ".ville-salles a.fiche-cinema-minia";
 
 // The day bar at the top of the page is the only place each day's ISO date
 // appears; the per-movie panes below carry just the weekday name. Build the
