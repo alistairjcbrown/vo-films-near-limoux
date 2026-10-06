@@ -43,11 +43,6 @@ test("parseVenues reads every venue's id, name and town", () => {
         location: "Castelnaudary",
       },
       {
-        id: "salle-elie-cabrol-pepieux",
-        name: "Salle Elie Cabrol",
-        location: "Pépieux",
-      },
-      {
         id: "palace-lezignan-corbieres",
         name: "Le Palace",
         location: "Lézignan-Corbières",
@@ -56,6 +51,11 @@ test("parseVenues reads every venue's id, name and town", () => {
         id: "cine-get-centre-culturel-de-revel-toulouse",
         name: "Revel - Ciné Get",
         location: "Revel",
+      },
+      {
+        id: "cinema-le-casino-ax-les-thermes",
+        name: "Le Casino",
+        location: "Ax-les-Thermes",
       },
     ],
   );
@@ -157,7 +157,7 @@ const programmation = (seanceAttrs) => `
     </li>
   </ul>`;
 
-const venuesPage = (row) => `<div class="adresses">${row}</div>`;
+const venuesPage = (row) => `<div class="ville-salles">${row}</div>`;
 const venueRow = ({
   href = "https://www.cinefil.com/cinema/le-cinema/programmation",
   heading = "Le Cinéma (Ville)",
